@@ -8,11 +8,40 @@ public sealed class KvStore : IStorageEngine
     private readonly LogReader _reader;
     private readonly Dictionary<string, long> _index;
 
-    public KvStore(string path)
+   public KvStore(string path)
     {
         _writer = new LogWriter(path);
         _reader = new LogReader(path);
         _index = new Dictionary<string, long>();
+        Recover();
+    }
+
+    private void Recover()
+    {
+        long length = _reader.Length;
+        long offset = 0;
+
+        while (offset < length)
+        {
+            LogRecord record;
+            int size;
+
+            try
+            {
+                (record, size) = _reader.ReadRecord(offset);
+            }
+            catch (Exception ex) when (ex is EndOfStreamException or InvalidDataException)
+            {
+                break;
+            }
+
+            if (record.Type == RecordType.Tombstone)
+                _index.Remove(record.Key);
+            else
+                _index[record.Key] = offset;
+
+            offset += size;
+        }
     }
 
     public void Set(string key, string value)
@@ -45,4 +74,5 @@ public sealed class KvStore : IStorageEngine
         _writer.Dispose();
         _reader.Dispose();
     }
+    
 }
