@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MiniDb.Api/MiniDb.Api.csproj" />
+    <Project Path="src/MiniDb.Engine/MiniDb.Engine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MiniDb.Tests/MiniDb.Tests.csproj" />
+  </Folder>
+</Solution>
