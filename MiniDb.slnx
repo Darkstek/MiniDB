@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/MiniDb.Benchmarks/MiniDb.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/MiniDb.Api/MiniDb.Api.csproj" />
     <Project Path="src/MiniDb.Engine/MiniDb.Engine.csproj" />
