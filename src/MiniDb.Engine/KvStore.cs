@@ -7,8 +7,9 @@ public sealed class KvStore : IStorageEngine
     private readonly LogWriter _writer;
     private readonly LogReader _reader;
     private readonly Dictionary<string, long> _index;
+    private readonly ReaderWriterLockSlim _lock = new();
 
-   public KvStore(string path)
+    public KvStore(string path)
     {
         _writer = new LogWriter(path);
         _reader = new LogReader(path);
@@ -46,33 +47,57 @@ public sealed class KvStore : IStorageEngine
 
     public void Set(string key, string value)
     {
-        var record = LogRecord.Set(key, value);
-        long offset = _writer.Append(record);
-        _index[key] = offset;
+        _lock.EnterWriteLock();
+        try
+        {
+            var record = LogRecord.Set(key, value);
+            long offset = _writer.Append(record);
+            _index[key] = offset;
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     public string? Get(string key)
     {
-        if (!_index.TryGetValue(key, out long offset))
-            return null;
+        _lock.EnterReadLock();
+        try
+        {
+            if (!_index.TryGetValue(key, out long offset))
+                return null;
 
-        LogRecord record = _reader.ReadAt(offset);
-        return record.Value;
+            LogRecord record = _reader.ReadAt(offset);
+            return record.Value;
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
     }
 
     public void Delete(string key)
     {
-        if (!_index.ContainsKey(key))
-            return;
+        _lock.EnterWriteLock();
+        try
+        {
+            if (!_index.ContainsKey(key))
+                return;
 
-        _writer.Append(LogRecord.Tombstone(key));
-        _index.Remove(key);
+            _writer.Append(LogRecord.Tombstone(key));
+            _index.Remove(key);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     public void Dispose()
     {
         _writer.Dispose();
         _reader.Dispose();
+        _lock.Dispose();
     }
-    
 }
