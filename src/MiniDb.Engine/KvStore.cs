@@ -4,13 +4,15 @@ namespace MiniDb.Engine;
 
 public sealed class KvStore : IStorageEngine
 {
-    private readonly LogWriter _writer;
-    private readonly LogReader _reader;
+    private readonly string _path;
     private readonly Dictionary<string, long> _index;
     private readonly ReaderWriterLockSlim _lock = new();
+    private LogWriter _writer;
+    private LogReader _reader;
 
     public KvStore(string path)
     {
+        _path = path;
         _writer = new LogWriter(path);
         _reader = new LogReader(path);
         _index = new Dictionary<string, long>();
@@ -87,6 +89,42 @@ public sealed class KvStore : IStorageEngine
 
             _writer.Append(LogRecord.Tombstone(key));
             _index.Remove(key);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
+    public void Compact()
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            string compactPath = _path + ".compact";
+            var newIndex = new Dictionary<string, long>(_index.Count);
+
+            using (var compactWriter = new LogWriter(compactPath))
+            {
+                foreach (string key in _index.Keys)
+                {
+                    LogRecord live = _reader.ReadAt(_index[key]);
+                    long newOffset = compactWriter.Append(live);
+                    newIndex[key] = newOffset;
+                }
+            }
+
+            _writer.Dispose();
+            _reader.Dispose();
+
+            File.Move(compactPath, _path, overwrite: true);
+
+            _writer = new LogWriter(_path);
+            _reader = new LogReader(_path);
+
+            _index.Clear();
+            foreach (var entry in newIndex)
+                _index[entry.Key] = entry.Value;
         }
         finally
         {
